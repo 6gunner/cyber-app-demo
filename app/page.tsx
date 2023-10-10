@@ -16,6 +16,9 @@ export default function Home() {
   const { register, handleSubmit } = useForm<any>();
   const [walletClient, setWalletClient] = React.useState<any>();
   const [account, setAccount] = React.useState<string>();
+  const [sendingViaCyberWallet, setSendingViaCyberWallet] =
+    React.useState(false);
+  const [sendingViaMetaMask, setSendingViaMetaMask] = React.useState(false);
 
   React.useEffect(() => {
     (async () => {
@@ -51,6 +54,7 @@ export default function Home() {
   }, []);
 
   const sendViaCyberWallet: SubmitHandler<any> = async (data) => {
+    setSendingViaCyberWallet(true);
     const { to, amount } = data;
 
     const hash = await app?.cyberWallet?.optimismGoerli
@@ -71,9 +75,12 @@ export default function Home() {
     if (hash) {
       alert("Transaction sent via CyberWallet: " + hash);
     }
+
+    setSendingViaCyberWallet(false);
   };
 
   const sendViaMetaMask: SubmitHandler<any> = async (data) => {
+    setSendingViaMetaMask(true);
     const { to, amount } = data;
 
     const hash = await walletClient.sendTransaction({
@@ -85,6 +92,7 @@ export default function Home() {
     if (hash) {
       alert("Transaction sent via MetaMask: " + hash);
     }
+    setSendingViaMetaMask(false);
   };
 
   return (
@@ -127,14 +135,16 @@ export default function Home() {
                   type="submit"
                   onClick={handleSubmit(sendViaCyberWallet)}
                 >
-                  Send Via CyberWallet
+                  {sendingViaCyberWallet
+                    ? "Sending..."
+                    : "Send Via CyberWallet"}
                 </Button>
                 <Button
                   type="submit"
                   onClick={handleSubmit(sendViaMetaMask)}
                   className="bg-orange-600"
                 >
-                  Send Via MetaMask
+                  {sendingViaMetaMask ? "Sending..." : "Send Via MetaMask"}
                 </Button>
               </div>
             </CardContent>
