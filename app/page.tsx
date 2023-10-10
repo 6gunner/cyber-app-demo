@@ -24,7 +24,7 @@ export default function Home() {
         transport: custom((window as any).ethereum),
       });
 
-      const [account] = await walletClient.getAddresses();
+      const [account] = await walletClient.requestAddresses();
 
       setWalletClient(walletClient);
       setAccount(account);
