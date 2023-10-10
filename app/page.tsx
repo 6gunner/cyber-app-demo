@@ -14,8 +14,22 @@ export default function Home() {
   const [res, setRes] = React.useState<string>();
   const [connected, setConnected] = React.useState(false);
   const { register, handleSubmit } = useForm<any>();
+  const [walletClient, setWalletClient] = React.useState<any>();
+  const [account, setAccount] = React.useState<string>();
 
   React.useEffect(() => {
+    (async () => {
+      const walletClient = createWalletClient({
+        chain: optimismGoerli,
+        transport: custom((window as any).ethereum),
+      });
+
+      const [account] = await walletClient.getAddresses();
+
+      setWalletClient(walletClient);
+      setAccount(account);
+    })();
+
     const app = new CyberApp({
       name: "testapp",
       icon: "https://plus.unsplash.com/premium_photo-1676068244015-6d08a8759079?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxlZGl0b3JpYWwtZmVlZHwyfHx8ZW58MHx8fHx8&auto=format&fit=crop&w=800&q=60",
@@ -61,13 +75,6 @@ export default function Home() {
 
   const sendViaMetaMask: SubmitHandler<any> = async (data) => {
     const { to, amount } = data;
-
-    const walletClient = createWalletClient({
-      chain: optimismGoerli,
-      transport: custom((window as any).ethereum),
-    });
-
-    const [account] = await walletClient.getAddresses();
 
     const hash = await walletClient.sendTransaction({
       account,
