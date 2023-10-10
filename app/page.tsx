@@ -49,9 +49,9 @@ export default function Home() {
         { description: "Transfering native token" },
       )
       .catch((err: EventError) => {
-        // if (err.name === ErrorType.SendTransactionError) {
-        //   console.log(err.shortMessage); // Transaction failed
-        // }
+        if (err.name === ErrorType.SendTransactionError) {
+          console.log(err.shortMessage); // Transaction failed
+        }
       });
 
     if (hash) {
