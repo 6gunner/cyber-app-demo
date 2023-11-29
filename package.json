@@ -17,6 +17,7 @@
     "@radix-ui/react-switch": "^1.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
+    "ethers": "^5.7.2",
     "lucide-react": "^0.284.0",
     "next": "latest",
     "react": "latest",
@@ -27,6 +28,9 @@
     "viem": "^1.15.2"
   },
   "devDependencies": {
+    "@ethersproject/abi": "^5.7.0",
+    "@ethersproject/providers": "^5.6.8",
+    "@typechain/ethers-v5": "^11.1.2",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
@@ -35,6 +39,7 @@
     "eslint-config-next": "latest",
     "postcss": "latest",
     "tailwindcss": "latest",
+    "typechain": "8.3.2",
     "typescript": "latest"
   }
 }

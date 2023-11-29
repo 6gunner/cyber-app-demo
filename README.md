@@ -12,6 +12,8 @@ yarn dev
 pnpm dev
 # or
 bun dev
+
+npx typechain --target ethers-v5 abi/erc20/ERC20.json --out-dir abi/ERC20
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
