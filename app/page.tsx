@@ -1,16 +1,22 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import React from "react";
-import { ethers } from "ethers";
-import { lineaTestnet, optimism, opBNB } from "viem/chains";
+
+import {
+  lineaTestnet,
+  optimism,
+  opBNB,
+  bsc,
+  opBNBTestnet,
+  bscTestnet,
+} from "viem/chains";
 import { CyberApp, CyberWallet } from "@cyberlab/cyber-app-sdk";
 import { parseUnits, type Hex, custom, createWalletClient } from "viem";
 import { useForm, SubmitHandler } from "react-hook-form";
 import Link from "next/link";
 
-import erc20ABI from "@/abi/ERC20.json";
-import TokenBridgeABI from "@/abi/TokenBridge.json";
 import {
+  NativeBridgeCard,
   ApproveErc20Card,
   TransferCard,
   TransferErc20Card,
@@ -70,11 +76,19 @@ export default function Home() {
           cyberWallet={app?.cyberWallet}
           network={currentNetwork}
         /> */}
-        <ApproveErc20Card
+        {/* <ApproveErc20Card
           cyberWallet={app?.cyberWallet}
           cyberAccount={cyberAccount}
           network={currentNetwork}
-        />
+        /> */}
+        <NativeBridgeCard
+          cyberWallet={app?.cyberWallet}
+          cyberAccount={cyberAccount}
+          sourceNetwork={opBNBTestnet}
+          targetNetwork={bscTestnet}
+          // sourceNetwork={optimism}
+          // targetNetwork={bsc}
+        ></NativeBridgeCard>
       </div>
 
       <Link

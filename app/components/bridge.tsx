@@ -2,22 +2,57 @@ import { CyberWallet, EventError, ErrorType } from "@cyberlab/cyber-app-sdk";
 import React from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { ethers } from "ethers";
-import type { Hex } from "viem";
+import { optimism, bsc, opBNBTestnet, bscTestnet } from "viem/chains";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+
 // abis
 import { ERC20 } from "@/abi/erc20";
+import { TokenBridge } from "@/abi/bridge";
+import TokenBridgeABI from "@/abi/TokenBridge.json";
 import erc20ABI from "@/abi/ERC20.json";
 
-import type { Chain } from "viem";
+import type { Chain, Hex } from "viem";
 
 type CyberAccount = CyberWallet["cyberAccount"];
 type ZkBridgeCardProps = {
   cyberWallet?: CyberWallet;
   cyberAccount?: CyberAccount;
-  network: Chain;
+  sourceNetwork: Chain;
+  targetNetwork: Chain;
+};
+export type BaseChainIds = 10 | 56 | number;
+
+type ZKbridgeConfig = {
+  [k in BaseChainIds]: {
+    routerContractAddress: string;
+    poolAddress: string;
+    lazyerZeroChainId: number;
+  };
+} & {
+  tokenName: string;
+  tokenAddress: Hex;
+  decimal: number;
+  poolId: number;
+};
+
+export const zkbridgeConfig: ZKbridgeConfig = {
+  tokenName: "cyber",
+  tokenAddress: "0x14778860e937f509e651192a90589de711fb88a9",
+  decimal: 18,
+  poolId: 1,
+  [optimism.id]: {
+    routerContractAddress: "0xbd0b158714871B2c55DA5B09FFE94661c88e64A1",
+    poolAddress: "0x03F06D95153aa1Aee59d8Cf685042C390EC5bb69",
+    lazyerZeroChainId: 111,
+  },
+  [bsc.id]: {
+    routerContractAddress: "0xbA4C2B9fd6741f83d1FcCe9d7dc138Ce607528b5",
+    poolAddress: "0x03F06D95153aa1Aee59d8Cf685042C390EC5bb69",
+    lazyerZeroChainId: 102,
+  },
 };
 
 export const useCheckAllowance = () => {
@@ -42,7 +77,7 @@ export const useCheckAllowance = () => {
 };
 
 function ZkBridgeCard(props: ZkBridgeCardProps) {
-  const { network, cyberAccount, cyberWallet } = props;
+  const { targetNetwork, sourceNetwork, cyberAccount, cyberWallet } = props;
 
   const { register, handleSubmit } = useForm<any>();
   const checkAllownace = useCheckAllowance();
@@ -53,22 +88,22 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
   const [approved, setAppvoved] = React.useState<
     "not-approved" | "approved" | "failed"
   >("not-approved");
-  // 发生原生token
 
-  const setApproveViaCyberWallet: SubmitHandler<any> = async (data) => {
+  // 授权
+  const approveViaCyberWallet: SubmitHandler<any> = async (data) => {
     if (!cyberWallet || !cyberAccount) {
       return false;
     }
-    const { to, amount } = data;
-    const spender = to;
-    const contractAddress = "0x479634564EF8c5C2412047EB8F1165e472c878C7";
+    const { amount } = data;
+    const spender = zkbridgeConfig[sourceNetwork.id].routerContractAddress;
+    const contractAddress = zkbridgeConfig.tokenAddress;
     const contractIterface = new ethers.utils.Interface(erc20ABI);
     // 授权此账户
     const approveEncoded = contractIterface.encodeFunctionData("approve", [
       spender,
       ethers.utils.parseUnits(amount, 18),
     ]) as Hex;
-    await cyberWallet["lineaTestnet"]
+    await cyberWallet["optimism"]
       .sendTransaction({
         to: contractAddress,
         value: "0",
@@ -82,20 +117,80 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
     setSendingViaCyberWallet(false);
   };
 
+  const transferViaCyberWallet: SubmitHandler<any> = async (data) => {
+    if (!cyberWallet || !cyberAccount) {
+      return false;
+    }
+    let { to, amount } = data;
+    amount = ethers.utils.parseUnits(amount, zkbridgeConfig.decimal);
+    const rpc = sourceNetwork.rpcUrls.default.http[0];
+    const provider = new ethers.providers.JsonRpcProvider(rpc);
+    const routerContractAddress =
+      zkbridgeConfig[sourceNetwork.id].routerContractAddress;
+    const contract = new ethers.Contract(
+      routerContractAddress,
+      TokenBridgeABI,
+      provider
+    );
+    const dstAppId = zkbridgeConfig[targetNetwork.id].lazyerZeroChainId;
+    const srcPoolId = zkbridgeConfig.poolId;
+    const dstPoolId = zkbridgeConfig.poolId;
+    const adapterParams = ethers.utils.solidityPack(
+      ["uint16", "uint256"],
+      [1, 200000]
+    );
+    const transferFee = await contract.estimateFee(
+      dstAppId,
+      srcPoolId,
+      dstPoolId,
+      amount,
+      to,
+      adapterParams
+    );
+    console.log(`transferFee = ${ethers.utils.formatEther(transferFee)}`);
+    const contractAddress = zkbridgeConfig.tokenAddress;
+    const contractIterface = new ethers.utils.Interface(TokenBridgeABI);
+    // transferToken
+    const approveEncoded = contractIterface.encodeFunctionData(
+      "transferToken",
+      [
+        dstAppId, //dstChainId
+        srcPoolId, //srcPoolId
+        dstPoolId, //dstPoolId
+        amount, //amount_
+        to, //recipient_
+        adapterParams,
+      ]
+    ) as Hex;
+    await cyberWallet["optimism"]
+      .sendTransaction({
+        to: contractAddress,
+        value: transferFee,
+        data: approveEncoded,
+      })
+      .catch((err: EventError) => {
+        if (err.name === ErrorType.SendTransactionError) {
+          console.log(err.shortMessage); // Transaction failed
+        }
+      });
+    setSendingViaCyberWallet(false);
+  };
+
+  // 检查是否已授权
   const checkApproveViaCyberWallet: SubmitHandler<any> = async (data) => {
     if (!cyberWallet || !cyberAccount) {
       return false;
     }
     setChecking(true);
-    const { to, amount } = data;
+    const { amount } = data;
     const owner = cyberAccount.address;
-    const spender = to;
-    const contractAddress = "0x479634564EF8c5C2412047EB8F1165e472c878C7";
+    const spender = zkbridgeConfig[sourceNetwork.id].routerContractAddress;
+    const contractAddress = zkbridgeConfig.tokenAddress;
     const allowance = await checkAllownace(
       contractAddress,
       owner,
       spender,
-      network
+      sourceNetwork
     );
     console.log(
       "allowance",
@@ -113,24 +208,30 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
   };
 
   return (
-    <Card className="h-fit" style={{ width: 500 }}>
+    <Card className="h-fit" style={{ width: 600 }}>
       <CardHeader>
-        <CardTitle>Approve & Fetch State</CardTitle>
+        <CardTitle>ZK Bridge State</CardTitle>
       </CardHeader>
       <CardContent>
         <form>
           <div className="my-4 flex flex-col gap-y-2">
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">
-                Chain
+                Source Chain
               </label>
-              <p>{network.name}</p>
+              <p>{sourceNetwork.name}</p>
+            </div>
+            <div>
+              <label className="block text-gray-700 text-sm font-bold mb-2">
+                Target Chain
+              </label>
+              <p>{targetNetwork.name}</p>
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">
                 Token
               </label>
-              <p>AA-Test</p>
+              <p>{zkbridgeConfig.tokenName}</p>
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">
@@ -154,9 +255,19 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
             >
               {checking ? "Checking..." : "Check Approve Status"}
             </Button>
+            {approved != "approved" ? (
+              <Button
+                type="submit"
+                onClick={handleSubmit(approveViaCyberWallet)}
+              >
+                Approve
+              </Button>
+            ) : (
+              ""
+            )}
             <Button
               type="submit"
-              onClick={handleSubmit(setApproveViaCyberWallet)}
+              onClick={handleSubmit(transferViaCyberWallet)}
             >
               {sendingViaCyberWallet ? "Sending..." : "Send Via CyberWallet"}
             </Button>
