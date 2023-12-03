@@ -163,7 +163,7 @@ function CyberBridgeCard(props: ZkBridgeCardProps) {
       to,
       adapterParams
     );
-    console.log(`transferFee = ${transferFee.toString()}`);
+    console.log(`transferFee = ${transferFee.toHexString()}`);
     console.log(`transferFee = ${ethers.utils.formatEther(transferFee)}`);
 
     const contractIterface = new ethers.utils.Interface(TokenBridgeABI);
@@ -181,7 +181,7 @@ function CyberBridgeCard(props: ZkBridgeCardProps) {
       .sendTransaction({
         to: routerContractAddress,
         // value: transferFee,
-        value: transferFee.toString(),
+        value: transferFee.toHexString(),
         data: encoded,
       })
       .catch((err: EventError) => {
