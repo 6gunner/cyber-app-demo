@@ -2,16 +2,25 @@ import { CyberWallet, EventError, ErrorType } from "@cyberlab/cyber-app-sdk";
 import React from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { ethers } from "ethers";
-import type { Hex } from "viem";
-
+import {
+  linea,
+  lineaTestnet,
+  optimism,
+  opBNB,
+  bsc,
+  opBNBTestnet,
+  bscTestnet,
+} from "viem/chains";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { GlobalContext } from "../page";
 // abis
 import { ERC20 } from "@/abi/erc20";
 import erc20ABI from "@/abi/ERC20.json";
-
-import type { Chain } from "viem";
+// type
+import type { Hex, Chain } from "viem";
+import type { ContextType } from "../page";
 
 type CyberAccount = CyberWallet["cyberAccount"];
 type TransferCardProp = {
@@ -19,6 +28,45 @@ type TransferCardProp = {
   cyberAccount?: CyberAccount;
   network: Chain;
 };
+
+export type BaseChainIds = number;
+
+interface ChainConfigDataItem {
+  erc20Token: {
+    contractAddress: Hex;
+    name: string;
+  };
+}
+type ChainConfig = {
+  [k in BaseChainIds]: ChainConfigDataItem;
+};
+
+const chainConfigs: ChainConfig = {
+  [lineaTestnet.id]: {
+    erc20Token: {
+      contractAddress: "0x479634564EF8c5C2412047EB8F1165e472c878C7",
+      name: "aa-test",
+    },
+  },
+  [linea.id]: {
+    erc20Token: {
+      contractAddress: "0xA219439258ca9da29E9Cc4cE5596924745e12B93",
+      name: "usdt",
+    },
+  },
+  [opBNB.id]: {
+    erc20Token: {
+      contractAddress: "0x55d398326f99059fF775485246999027B3197955",
+      name: "usdt",
+    },
+  },
+  [opBNBTestnet.id]: {
+    erc20Token: {
+      contractAddress: "0xCF712f20c85421d00EAa1B6F6545AaEEb4492B75",
+      name: "usdt",
+    },
+  },
+} as const satisfies ChainConfig;
 
 export const useCheckAllowance = () => {
   return React.useCallback(
@@ -41,8 +89,9 @@ export const useCheckAllowance = () => {
   );
 };
 
-function TransferCard(props: TransferCardProp) {
-  const { network, cyberAccount, cyberWallet } = props;
+function TransferCard() {
+  const contextVal = React.useContext<ContextType>(GlobalContext);
+  const { network, cyberAccount, app, provider } = contextVal;
 
   const { register, handleSubmit } = useForm<any>();
   const checkAllownace = useCheckAllowance();
@@ -55,24 +104,34 @@ function TransferCard(props: TransferCardProp) {
   >("not-approved");
   // 发生原生token
 
+  if (!network) {
+    return;
+  }
+  const chainConfig = chainConfigs[network.id];
+
   const setApproveViaCyberWallet: SubmitHandler<any> = async (data) => {
-    if (!cyberWallet || !cyberAccount) {
+    if (!cyberAccount) {
       return false;
     }
     const { to, amount } = data;
     const spender = to;
-    const contractAddress = "0x479634564EF8c5C2412047EB8F1165e472c878C7";
     const contractIterface = new ethers.utils.Interface(erc20ABI);
     // 授权此账户
     const approveEncoded = contractIterface.encodeFunctionData("approve", [
       spender,
       ethers.utils.parseUnits(amount, 18),
     ]) as Hex;
-    await cyberWallet["lineaTestnet"]
+
+    await app?.cyberWallet
       .sendTransaction({
-        to: contractAddress,
+        to: chainConfig.erc20Token.contractAddress,
         value: "0",
         data: approveEncoded,
+        ctx: {
+          chainId: network.id, // 当前网络的id，我尝试过BNB，opBNB，opBNBTest, BNBTest各个网络的id，都无法成功；
+          owner: app.cyberWallet.cyberAccount?.ownerAddress as Hex,
+          appId: app.appId,
+        },
       })
       .catch((err: EventError) => {
         if (err.name === ErrorType.SendTransactionError) {
@@ -83,16 +142,15 @@ function TransferCard(props: TransferCardProp) {
   };
 
   const checkApproveViaCyberWallet: SubmitHandler<any> = async (data) => {
-    if (!cyberWallet || !cyberAccount) {
+    if (!app || !app.cyberWallet || !cyberAccount) {
       return false;
     }
     setChecking(true);
     const { to, amount } = data;
     const owner = cyberAccount.address;
     const spender = to;
-    const contractAddress = "0x479634564EF8c5C2412047EB8F1165e472c878C7";
     const allowance = await checkAllownace(
-      contractAddress,
+      chainConfig.erc20Token.contractAddress,
       owner,
       spender,
       network
@@ -130,7 +188,7 @@ function TransferCard(props: TransferCardProp) {
               <label className="block text-gray-700 text-sm font-bold mb-2">
                 Token
               </label>
-              <p>AA-Test</p>
+              <p>{chainConfig.erc20Token.name}</p>
             </div>
             <div>
               <label className="block text-gray-700 text-sm font-bold mb-2">

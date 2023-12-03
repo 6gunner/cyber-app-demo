@@ -2,7 +2,14 @@ import { CyberWallet, EventError, ErrorType } from "@cyberlab/cyber-app-sdk";
 import React from "react";
 import { useForm, SubmitHandler } from "react-hook-form";
 import { ethers } from "ethers";
-import { optimism, bsc, opBNBTestnet, bscTestnet } from "viem/chains";
+import {
+  optimism,
+  optimismGoerli,
+  bsc,
+  opBNBTestnet,
+  bscTestnet,
+  mainnet,
+} from "viem/chains";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,9 +34,10 @@ export type BaseChainIds = 10 | 56 | number;
 
 type ZKbridgeConfig = {
   [k in BaseChainIds]: {
-    routerContractAddress: string;
+    routerContractAddress: Hex;
     poolAddress: string;
     lazyerZeroChainId: number;
+    appId?: number;
   };
 } & {
   tokenName: string;
@@ -47,10 +55,17 @@ export const zkbridgeConfig: ZKbridgeConfig = {
     routerContractAddress: "0xbd0b158714871B2c55DA5B09FFE94661c88e64A1",
     poolAddress: "0x03F06D95153aa1Aee59d8Cf685042C390EC5bb69",
     lazyerZeroChainId: 111,
+    appId: 7,
   },
   [bsc.id]: {
     routerContractAddress: "0xbA4C2B9fd6741f83d1FcCe9d7dc138Ce607528b5",
-    poolAddress: "0x03F06D95153aa1Aee59d8Cf685042C390EC5bb69",
+    poolAddress: "0xc3cA65691c1A3aD78212b5A0ef524DEF24d95D73",
+    lazyerZeroChainId: 102,
+    appId: 3,
+  },
+  [mainnet.id]: {
+    routerContractAddress: "0x0B08230A5e0AF064Fd30229aa38cbfdb8429ec21",
+    poolAddress: "0xBFa7Df0054db804E4C138411f5Da948f030f1D8e",
     lazyerZeroChainId: 102,
   },
 };
@@ -76,7 +91,7 @@ export const useCheckAllowance = () => {
   );
 };
 
-function ZkBridgeCard(props: ZkBridgeCardProps) {
+function CyberBridgeCard(props: ZkBridgeCardProps) {
   const { targetNetwork, sourceNetwork, cyberAccount, cyberWallet } = props;
 
   const { register, handleSubmit } = useForm<any>();
@@ -121,7 +136,8 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
     if (!cyberWallet || !cyberAccount) {
       return false;
     }
-    let { to, amount } = data;
+    const to = cyberAccount.address;
+    let { amount } = data;
     amount = ethers.utils.parseUnits(amount, zkbridgeConfig.decimal);
     const rpc = sourceNetwork.rpcUrls.default.http[0];
     const provider = new ethers.providers.JsonRpcProvider(rpc);
@@ -147,26 +163,26 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
       to,
       adapterParams
     );
+    console.log(`transferFee = ${transferFee.toString()}`);
     console.log(`transferFee = ${ethers.utils.formatEther(transferFee)}`);
-    const contractAddress = zkbridgeConfig.tokenAddress;
+
     const contractIterface = new ethers.utils.Interface(TokenBridgeABI);
     // transferToken
-    const approveEncoded = contractIterface.encodeFunctionData(
-      "transferToken",
-      [
-        dstAppId, //dstChainId
-        srcPoolId, //srcPoolId
-        dstPoolId, //dstPoolId
-        amount, //amount_
-        to, //recipient_
-        adapterParams,
-      ]
-    ) as Hex;
+    const encoded = contractIterface.encodeFunctionData("transferToken", [
+      dstAppId, //dstChainId
+      srcPoolId, //srcPoolId
+      dstPoolId, //dstPoolId
+      amount, //amount_
+      to, //recipient_
+      adapterParams,
+    ]) as Hex;
+    debugger;
     await cyberWallet["optimism"]
       .sendTransaction({
-        to: contractAddress,
-        value: transferFee,
-        data: approveEncoded,
+        to: routerContractAddress,
+        // value: transferFee,
+        value: transferFee.toString(),
+        data: encoded,
       })
       .catch((err: EventError) => {
         if (err.name === ErrorType.SendTransactionError) {
@@ -210,7 +226,7 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
   return (
     <Card className="h-fit" style={{ width: 600 }}>
       <CardHeader>
-        <CardTitle>ZK Bridge State</CardTitle>
+        <CardTitle>Cyber Bridge State</CardTitle>
       </CardHeader>
       <CardContent>
         <form>
@@ -247,7 +263,7 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
           <label className="block text-gray-700 text-sm font-bold my-2">
             Address
           </label>
-          <Input {...register("to")} />
+          <Input value={cyberAccount?.address} {...register("to")} />
           <div className="flex gap-x-4 mt-8">
             <Button
               type="submit"
@@ -278,4 +294,4 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
   );
 }
 
-export default ZkBridgeCard;
+export default CyberBridgeCard;

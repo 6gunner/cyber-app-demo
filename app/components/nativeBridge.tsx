@@ -115,7 +115,6 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
       zkbridgeConfig[sourceNetwork.id].routerContractAddress;
     const contractIterface = new ethers.utils.Interface(L2BridgeABI);
     // transferToken
-    debugger;
     const calldata = contractIterface.encodeFunctionData("transferETH", [
       dstAppId, //dstAppId
       amount, //amount_
@@ -131,7 +130,8 @@ function ZkBridgeCard(props: ZkBridgeCardProps) {
     //       owner: cyberAccount.ownerAddress,
     //     },
     //   })
-    await cyberWallet["opBnbTestnet"]
+    debugger;
+    await cyberWallet["opBnb"]
       .sendTransaction({
         to: contractAddress,
         value: transferFee.add(amount),
